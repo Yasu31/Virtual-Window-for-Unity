@@ -6,18 +6,21 @@ using UnityEngine.SceneManagement;
 public class CameraMoveScript : MonoBehaviour {
     public OSC osc;
 	public float fovDegrees=30;//horizontal fanning. Determining this accurately is important in correct measurements
-	public float screenWidth=30;//in cm
-	public float screenHeight = 17;//in cm
 	public float numerator = 200;
-    private int numOfScenes = 3;
+	public Vector2 screenDimension=new Vector2(30,17);//in centimeters
+	public Vector2 cameraPos=new Vector2(0,0);//offset of camera position compared to "normal" placement- above the screen.
+
+	public bool set_parameters_mode = false;
+
 	public float[] captureSize = { 640, 320 };
     private bool isAutoMove=false;
     private Vector3 origin;
-    
+
     private bool isReceiving = false;
 	Vector3 bottomLeft;
 	Vector3 bottomRight;
 	Vector3 topLeft;
+
     private float theta;
     private float rawX, rawY, rawScale;
     private Vector3 facePos = new Vector3(0, 0, -50);
@@ -28,8 +31,12 @@ public class CameraMoveScript : MonoBehaviour {
     private float openStartTime;
 
     private float speed = 30f;
+	private float eyeOffset=10; //offset of eye from faceOSC's face center
 
     public GameObject cameraBox;
+
+	private string messagePopup="";
+	private float messagePopupStart;
 
     GUIStyle style = new GUIStyle(GUIStyle.none);
 
@@ -39,23 +46,40 @@ public class CameraMoveScript : MonoBehaviour {
 
         osc.SetAddressHandler("/pose/position", OnReceiveFace);
         osc.SetAddressHandler("/pose/scale", onReceiveScale);
-
-        theta = fovDegrees * (3.14f / 180);//horizontal fanning of camera in radians
-
-
-		bottomLeft = new Vector3 (-screenWidth / 2, -screenHeight / 2, 0);
-		bottomRight = new Vector3 (screenWidth / 2, -screenHeight / 2, 0);
-		topLeft = new Vector3 (-screenWidth / 2, screenHeight / 2, 0);
-
-        focus = captureSize[0] / 2 / Mathf.Tan(theta / 2);
+		setupParameters ();
 
         // remembers the original position of the camera box, so it can be reset later
         origin = cameraBox.transform.position;
     }
-    
+
+	void setupParameters(){
+		theta = fovDegrees * (3.14f / 180);//horizontal fanning of camera in radians
+
+		bottomLeft = new Vector3 (-screenDimension.x / 2, -screenDimension.y / 2, 0);
+		bottomRight = new Vector3 (screenDimension.x / 2, -screenDimension.y / 2, 0);
+		topLeft = new Vector3 (-screenDimension.x / 2, screenDimension.y / 2, 0);
+
+		focus = captureSize[0] / 2 / Mathf.Tan(theta / 2);
+	}
+
+	private void setMessage(string msg)
+	{
+		messagePopup = "<b>"+msg+"</b>";
+		messagePopupStart = Time.time;
+	}
+
     private void OnGUI()
     {
-        //TODO: show "settings" button
+		if (Time.time - messagePopupStart < 4)
+		{
+			GUI.backgroundColor = Color.black;
+			GUI.Button(new Rect(Screen.width / 2 - 200, Screen.height / 2 - 40, 400, 80), messagePopup, style);
+		}
+		if (set_parameters_mode) {
+			GUI.Label (new Rect (10, 10, 1000, 100), "numerator\t" + numerator
+				+"\nfov\t"+fovDegrees+" degrees"
+				+"\nface X\t"+facePos.x+"cm\nface Y\t"+facePos.y+"cm\nface Z\t"+facePos.z+"cm");
+		}
     }
 
 
@@ -63,6 +87,9 @@ public class CameraMoveScript : MonoBehaviour {
     void Update()
     {
         UpdateFacePos();
+		if (!isReceiving)
+			return;
+
         Camera cam = Camera.main;
 
         Matrix4x4 pm = GeneralizedPerspectiveProjection(bottomLeft, bottomRight, topLeft, facePos, cam.nearClipPlane, cam.farClipPlane);
@@ -87,14 +114,16 @@ public class CameraMoveScript : MonoBehaviour {
                 cameraBox.transform.Translate(-1 * cameraBox.transform.forward * Time.deltaTime * speed);
         }
 
-        if (Input.GetKey(KeyCode.RightArrow))
-            cameraBox.transform.Translate(cameraBox.transform.right*Time.deltaTime*speed);
-        if (Input.GetKey(KeyCode.LeftArrow))
-            cameraBox.transform.Translate(-1* cameraBox.transform.right* Time.deltaTime * speed);
-        if (Input.GetKey(KeyCode.UpArrow))
-            cameraBox.transform.Translate(cameraBox.transform.forward * Time.deltaTime * speed);
-        if (Input.GetKey(KeyCode.DownArrow))
-            cameraBox.transform.Translate(-1 * cameraBox.transform.forward * Time.deltaTime * speed);
+		if (!set_parameters_mode) {
+			if (Input.GetKey (KeyCode.RightArrow))
+				cameraBox.transform.Translate (cameraBox.transform.right * Time.deltaTime * speed);
+			if (Input.GetKey (KeyCode.LeftArrow))
+				cameraBox.transform.Translate (-1 * cameraBox.transform.right * Time.deltaTime * speed);
+			if (Input.GetKey (KeyCode.UpArrow))
+				cameraBox.transform.Translate (cameraBox.transform.forward * Time.deltaTime * speed);
+			if (Input.GetKey (KeyCode.DownArrow))
+				cameraBox.transform.Translate (-1 * cameraBox.transform.forward * Time.deltaTime * speed);
+		}
 
         //マウス
         float mouseWheelScroll = Input.GetAxis("Mouse ScrollWheel");
@@ -108,6 +137,25 @@ public class CameraMoveScript : MonoBehaviour {
         {
             cameraBox.transform.Translate(-1*transform.right * speed * Time.deltaTime);
         }
+
+		if (set_parameters_mode) {
+			if (Input.GetKey (KeyCode.UpArrow)) {
+				numerator++;
+				setupParameters ();
+			}
+			if (Input.GetKey (KeyCode.DownArrow)) {
+				numerator--;
+				setupParameters ();
+			}
+			if (Input.GetKey (KeyCode.RightArrow)) {
+				fovDegrees++;
+				setupParameters ();
+			}
+			if (Input.GetKey (KeyCode.LeftArrow)) {
+				fovDegrees--;
+				setupParameters ();
+			}
+		}
     }
 
 
@@ -125,7 +173,7 @@ public class CameraMoveScript : MonoBehaviour {
         //to determine if it's actually been receiving data for a while
         isReceiving = true;
     }
-    
+
     void UpdateFacePos()
     {
         if (!isReceiving)
@@ -136,8 +184,8 @@ public class CameraMoveScript : MonoBehaviour {
 
         //isAutoMove = true;
         float distance = numerator / rawScale;
-        facePos.x = -(rawX - captureSize[0] / 2) * distance / focus;
-        facePos.y = -(rawY - captureSize[1] / 2) * distance / focus+screenHeight/2;
+		facePos.x = -(rawX - captureSize[0] / 2) * distance / focus-cameraPos.x;
+		facePos.y = -(rawY - captureSize[1] / 2) * distance / focus-screenDimension.y/2-cameraPos.y+eyeOffset;
         facePos.z = -distance;
 
         print(facePos);
@@ -243,25 +291,7 @@ public class CameraMoveScript : MonoBehaviour {
 		return m;
 	}
 
-    //tried to have the window settings to be user-definable, but I don't have time now.
-    //    private Rect windowrect = new Rect(0, 0, 120, 120);
-    //   private int fov;
-    //    private int captureWidth;
-    //    private int captureHeight;
-    //    private int screenWidth2;
-    //    private int screenHeight2;
-    //    private int numerator2;
-    //    void OnGUI()
-    //    {
-    //       windowrect = GUI.Window(0, windowrect, DoMyWindow, "configuration");
-    //
-    //    }
 
-    //    void DoMyWindow()
-    //    {
-    //        GUI.Label(new Rect(0, 0, 60, 20), "fov");
-    //        GUI.TextField(new Rect(60,0,60,20), )
-    //    }
 
 
 

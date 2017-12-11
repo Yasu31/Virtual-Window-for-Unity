@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.44657868, g: 0.49641263, b: 0.57481706, a: 1}
+  m_IndirectSpecularColor: {r: 0.44657826, g: 0.49641263, b: 0.57481676, a: 1}
 --- !u!157 &3
 LightmapSettings:
   m_ObjectHideFlags: 0
@@ -290,9 +290,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   osc: {fileID: 1575020861}
   fovDegrees: 100
-  screenWidth: 30
-  screenHeight: 17
   numerator: 200
+  screenDimension: {x: 30, y: 17}
+  cameraPos: {x: 0, y: 0}
+  set_parameters_mode: 1
   captureSize:
   - 640
   - 320
@@ -502,7 +503,7 @@ Transform:
   m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 331928487}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -4.1, z: 0}
+  m_LocalPosition: {x: 0, y: -11.3, z: -2.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 57401603}
